@@ -1,5 +1,7 @@
 import scrapy
 
+TOTAL_COUNT = 5000
+
 class RedditSpider(scrapy.Spider):
     name = "reddit_spider"
     start_urls = ['https://www.reddit.com/r/popular/']
@@ -20,10 +22,10 @@ class RedditSpider(scrapy.Spider):
 
             self.post_count += 1  # Increment the post count
 
-            if self.post_count >= 5000:  # Stop scraping when post count reaches 5000
+            if self.post_count >= TOTAL_COUNT:  # Stop scraping when post count reaches 5000
                 break
 
         # Follow the 'Next' button recursively
         next_page = response.css('a[rel="next"]::attr(href)').get()
-        if next_page is not None  and self.post_count < 5000:
+        if next_page is not None  and self.post_count < TOTAL_COUNT:
             yield response.follow(next_page, self.parse)
