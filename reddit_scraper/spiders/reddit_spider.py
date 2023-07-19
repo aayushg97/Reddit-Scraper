@@ -1,29 +1,55 @@
 import scrapy
-
-TOTAL_COUNT = 5000
+import json
 
 class RedditSpider(scrapy.Spider):
     name = "reddit_spider"
-    start_urls = ['https://www.reddit.com/r/AskReddit/']
-    post_count = 0
+    start_urls = ['https://www.reddit.com/r/AskReddit/new.json?limit=100']
 
     def parse(self, response):
-        # Extracting question-answer data from Reddit threads
-        for thread in response.css('div.Post'):
-            question = thread.css('h3._eYtD2XCVieq6emjKBH3m::text').get()
-            answers = thread.css('div._1rZYMD_4xY3gRcSS3p8ODO::text').getall()
+        data = json.loads(response.body)
+        for post in data['data']['children']:
+            title = post['data']['title']
+            question = post['data']['selftext']
+            post_id = post['data']['id']
+            answers_url = f"https://www.reddit.com/r/AskReddit/comments/{post_id}.json"
 
-            yield {
-                'question': question,
-                'answers': answers
-            }
-            
-            self.post_count += 1  # Increment the post count
+            yield scrapy.Request(answers_url, callback=self.parse_answers, meta={'title': title, 'question': question})
 
-            if self.post_count >= TOTAL_COUNT:  # Stop scraping when post count reaches TOTAL_COUNT
-                break
+        after = data['data']['after']
+        if after is not None:
+            next_url = f'https://www.reddit.com/r/AskReddit/new.json?limit=100&after={after}'
+            yield response.follow(next_url, self.parse)
 
-        # Follow the 'Next' button recursively
-        next_page = response.css('a[rel="next"]::attr(href)').get()
-        if next_page is not None and self.post_count < TOTAL_COUNT:
-            yield response.follow(next_page, self.parse)
+    def parse_answers(self, response):
+        data = json.loads(response.body)
+        title = response.meta['title']
+        question = response.meta['question']
+        answers = []
+
+        for comment in data[1]['data']['children']:
+            answer = self.extract_answer(comment)
+            if answer:
+                answers.append(answer)
+
+        yield {
+            'title': title,
+            'question': question,
+            'answers': answers
+        }
+
+    def extract_answer(self, comment):
+        if 'body' in comment['data']:
+            return comment['data']['body']
+
+        # if 'replies' in comment['data']:
+        #     replies = comment['data']['replies']['data']['children']
+        #     nested_answers = []
+
+        #     for reply in replies:
+        #         nested_answer = self.extract_answer(reply)
+        #         if nested_answer:
+        #             nested_answers.append(nested_answer)
+
+        #     return nested_answers
+
+        return None
