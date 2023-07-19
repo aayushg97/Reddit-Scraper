@@ -1,4 +1,4 @@
-# Reddit-Scraper
+# Scraping question-answers from reddit
 To extract questions and answers from reddit, run the following. Output will be saved to Reddit_data.pkl
 
 `python RedditAPI.py`
